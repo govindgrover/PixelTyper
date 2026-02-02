@@ -1,13 +1,15 @@
+from datetime import date
+
 from PIL import Image, ImageDraw, ImageFont
 import cv2
 import json, os
 
 import tkinter as tk
-from tkinter import simpledialog
+from tkinter import simpledialog, filedialog
 
 CONFIG: dict = json.load(open("config.json", "r"))
 
-def create_image_with_text(text, image_path, position, text_color=(0, 0, 0), font_size=20):
+def create_image_with_text(text, image_path, position: tuple =(), text_color=(0, 0, 0), font_size=20) -> Image.Image:
 	# Create a new image with the specified background color
 	image = Image.open(image_path).convert("RGB")
 	
@@ -19,16 +21,17 @@ def create_image_with_text(text, image_path, position, text_color=(0, 0, 0), fon
 		font = ImageFont.truetype(CONFIG["fonts"]["Ocraext"]["normal"], font_size)
 	except IOError:
 		font = ImageFont.load_default()
-	
+
+	# Single position mode
 	# Draw the text onto the image
 	draw.text(position, text, fill=text_color, font=font)
-
 	# image.show()
 	image.save("./outputs/_editied-{}.jpg".format(os.path.basename(image_path)))
+	print(f"Image saved to ./outputs/_editied-{os.path.basename(image_path)}")
 
 	return image
 
-def get_coordinates(image_path, max_width=1280, max_height=720):
+def make_coordinates_template(image_path, max_width=1280, max_height=720) -> None:
 	# Setup a hidden Tkinter root for the dialog boxes
 	root = tk.Tk()
 	root.withdraw()
@@ -36,7 +39,6 @@ def get_coordinates(image_path, max_width=1280, max_height=720):
 	# Load the image
 	img = cv2.imread(image_path)
 	points: dict = {}
-	template_name = 'HEHEHE'
 
 	if img is None:
 		raise ValueError(f"Could not load image: {image_path}")
@@ -57,6 +59,12 @@ def get_coordinates(image_path, max_width=1280, max_height=720):
 		print(f"Image resized for display: {original_width}x{original_height} -> {new_width}x{new_height}")
 	else:
 		display_img = img.copy()
+
+	# Ask the user to enter a template name
+	template_name = simpledialog.askstring("Template Name", "Enter a name for the template:", parent=root)
+	if template_name is None or template_name.strip() == "":
+		print("No template name provided, using default 'template'.")
+		template_name = "template" + str(date.today().strftime("%Y%m%d%H%M%S"))
 	
 	# This function will be called whenever a mouse event happens
 	def click_event(event, x, y, flags, params):
@@ -91,8 +99,7 @@ def get_coordinates(image_path, max_width=1280, max_height=720):
 	cv2.destroyAllWindows()
 
 	# Save as JSON
-	with open(f"{template_name}.json", "w") as f:
+	with open(f"./coord_templates/{template_name}.json", "w") as f:
 		json.dump(points, f, indent=4)
 	print(f"Template saved as {template_name}.json")
 
-	return selected_point
