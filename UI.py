@@ -1,14 +1,16 @@
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, colorchooser
 from ctk_colorpicker_plus import AskColor
 from PIL import Image, ImageTk
 import os
 import json
 import functions as fn
+import shutil
+import platform
 from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from __main__ import PixelTyperApp
+	from __main__ import PixelTyperApp
 
 CONFIG = fn.CONFIG  # Import CONFIG for font access
 
@@ -21,15 +23,15 @@ def _get_available_fonts():
 	config_fonts = list(CONFIG.get("fonts", {}).keys())
 	fonts.extend(config_fonts)
 	
-	# Scan ./fonts/ directory for any .ttf/.TTF/.otf/.OTF files
-	fonts_dir = "./fonts"
+	# Scan user fonts directory for any .ttf/.TTF/.otf/.OTF files
+	fonts_dir = fn.ensure_user_fonts_dir()
 	if os.path.exists(fonts_dir):
 		for filename in os.listdir(fonts_dir):
-			if filename.lower().endswith(('.ttf', '.otf')):
-				# Remove extension and add to list if not already there
-				font_name = os.path.splitext(filename)[0]
-				if font_name not in fonts:
-					fonts.append(font_name)
+			if filename.lower().endswith(('.ttf', '.otf', '.ttc')):
+					# Remove extension and add to list if not already there
+					font_name = os.path.splitext(filename)[0]
+					if font_name not in fonts:
+						fonts.append(font_name)
 	
 	# Add common system fonts (platform-specific)
 	import platform
@@ -52,6 +54,75 @@ def _get_available_fonts():
 				fonts.append(f"[System] {font_name}")
 	
 	return fonts
+
+
+def _copy_user_fonts(font_paths) -> list:
+	"""Copy user-selected fonts into app data and return destination paths."""
+	if not font_paths:
+		return []
+	fonts_dir = fn.ensure_user_fonts_dir()
+	copied = []
+	for font_path in font_paths:
+		if not font_path or not os.path.exists(font_path):
+			continue
+		ext = os.path.splitext(font_path)[1].lower()
+		if ext not in [".ttf", ".otf", ".ttc"]:
+			continue
+		dest_path = os.path.join(fonts_dir, os.path.basename(font_path))
+		shutil.copy2(font_path, dest_path)
+		copied.append(dest_path)
+	return copied
+
+
+def _pick_color(initial_color: str):
+	"""Open color picker and return hex string or None."""
+	try:
+		picker = AskColor(initial_color=initial_color)
+		color = picker.get()
+		if color:
+			return color
+	except Exception:
+		pass
+	# Fallback to native color chooser
+	try:
+		_, hex_color = colorchooser.askcolor(color=initial_color)
+		return hex_color
+	except Exception:
+		return None
+
+
+def _bind_int_mousewheel(entry, min_value: int = 1, max_value: Optional[int] = None, step: int = 1, on_change=None):
+	"""Bind mouse wheel to increment/decrement integer entry."""
+	def _get_value():
+		try:
+			return int(entry.get().strip())
+		except Exception:
+			return min_value
+
+	def _set_value(val: int):
+		if max_value is not None:
+			val = min(val, max_value)
+		val = max(min_value, val)
+		entry.delete(0, "end")
+		entry.insert(0, str(val))
+		if on_change:
+			on_change()
+
+	def _on_wheel(event):
+		delta = 0
+		if hasattr(event, "delta") and event.delta:
+			delta = 1 if event.delta > 0 else -1
+		elif hasattr(event, "num"):
+			if event.num == 4:
+				delta = 1
+			elif event.num == 5:
+				delta = -1
+		if delta != 0:
+			_set_value(_get_value() + (step * delta))
+
+	entry.bind("<MouseWheel>", _on_wheel)
+	entry.bind("<Button-4>", _on_wheel)
+	entry.bind("<Button-5>", _on_wheel)
 
 
 def _load_config():
@@ -256,6 +327,7 @@ class SimpleOverlayTab(ctk.CTkFrame):
 		self.x_entry = ctk.CTkEntry(coord_frame, width=80, placeholder_text="0")
 		style_entry(self.x_entry)
 		self.x_entry.pack(side="left", padx=5)
+		_bind_int_mousewheel(self.x_entry, min_value=0)
 		
 		label_y = ctk.CTkLabel(coord_frame, text="Y:")
 		style_label(label_y, muted=True)
@@ -263,6 +335,7 @@ class SimpleOverlayTab(ctk.CTkFrame):
 		self.y_entry = ctk.CTkEntry(coord_frame, width=80, placeholder_text="0")
 		style_entry(self.y_entry)
 		self.y_entry.pack(side="left", padx=5)
+		_bind_int_mousewheel(self.y_entry, min_value=0)
 		
 		btn_select = ctk.CTkButton(coord_frame, text="Click to Select", command=self.select_coordinates)
 		style_button(btn_select, "secondary")
@@ -282,6 +355,7 @@ class SimpleOverlayTab(ctk.CTkFrame):
 		style_entry(self.fontsize_entry)
 		self.fontsize_entry.insert(0, "20")
 		self.fontsize_entry.pack(side="left", padx=5)
+		_bind_int_mousewheel(self.fontsize_entry, min_value=1)
 		
 		label_color = ctk.CTkLabel(style_inner, text="Color:")
 		style_label(label_color, muted=True)
@@ -311,6 +385,24 @@ class SimpleOverlayTab(ctk.CTkFrame):
 		)
 		self.font_style_menu.set(available_fonts[0] if available_fonts else "Ocraext")
 		self.font_style_menu.pack(side="left", padx=5)
+
+		# Add font button
+		btn_add_font = ctk.CTkButton(style_inner, text="Add Font", width=80, command=self.add_user_font)
+		style_button(btn_add_font, "secondary")
+		btn_add_font.pack(side="left", padx=5)
+
+		# Opacity slider (inline)
+		label_opacity = ctk.CTkLabel(style_inner, text="Opacity:")
+		style_label(label_opacity, muted=True)
+		label_opacity.pack(side="left", padx=(10, 5))
+		self.opacity_value = ctk.StringVar(value="100%")
+		self.opacity_slider = ctk.CTkSlider(style_inner, from_=0, to=100, number_of_steps=100, width=120)
+		self.opacity_slider.set(100)
+		self.opacity_slider.pack(side="left", padx=(0, 5))
+		self.opacity_label = ctk.CTkLabel(style_inner, textvariable=self.opacity_value, width=50)
+		style_label(self.opacity_label, muted=True)
+		self.opacity_label.pack(side="left")
+		self.opacity_slider.configure(command=lambda v: self.opacity_value.set(f"{int(v)}%"))
 		
 		# Apply button
 		btn_apply = ctk.CTkButton(self, text="Apply Text Overlay", command=self.apply_overlay,
@@ -319,8 +411,15 @@ class SimpleOverlayTab(ctk.CTkFrame):
 		btn_apply.grid(row=4, column=0, padx=20, pady=20, sticky="ew")
 		
 		# Status
-		self.status_label = ctk.CTkLabel(self, text="", text_color=COLORS["text_muted"])
-		self.status_label.grid(row=5, column=0, padx=20, pady=5)
+		self.last_output_path = None
+		status_frame = ctk.CTkFrame(self, fg_color="transparent")
+		status_frame.grid(row=5, column=0, padx=20, pady=5, sticky="ew")
+		status_frame.grid_columnconfigure(0, weight=1)
+		self.status_label = ctk.CTkLabel(status_frame, text="", text_color=COLORS["text_muted"], anchor="w")
+		self.status_label.grid(row=0, column=0, sticky="ew")
+		self.open_output_btn = ctk.CTkButton(status_frame, text="Open", width=70, command=self.open_last_output, state="disabled")
+		style_button(self.open_output_btn, "secondary")
+		self.open_output_btn.grid(row=0, column=1, padx=(10, 0))
 	
 	def browse_image(self):
 		"""Browse for image file"""
@@ -365,19 +464,37 @@ class SimpleOverlayTab(ctk.CTkFrame):
 			scale = 1.0
 		
 		selected: list = [None]
+
+		def _draw_instructions(target_img):
+			instruction = "Left click: select | Enter/Space: finish | Esc: cancel"
+			cv2.putText(target_img, instruction, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 		
 		def click_event(event, x, y, flags, params):
 			if event == cv2.EVENT_LBUTTONDOWN:
-				original_x = int(x / scale)
-				original_y = int(y / scale)
+				original_x = int(round(x / scale))
+				original_y = int(round(y / scale))
 				selected[0] = (original_x, original_y)
 				cv2.circle(display_img, (x, y), 5, (0, 255, 0), -1)
+				cv2.line(display_img, (x - 8, y), (x + 8, y), (0, 255, 0), 1)
+				cv2.line(display_img, (x, y - 8), (x, y + 8), (0, 255, 0), 1)
+				_draw_instructions(display_img)
 				cv2.imshow("Select Position", display_img)
 		
+		_draw_instructions(display_img)
 		cv2.imshow("Select Position", display_img)
 		cv2.setMouseCallback("Select Position", click_event)
-		cv2.waitKey(0)
+		cancelled = False
+		while True:
+			key = cv2.waitKey(20) & 0xFF
+			if key in (ord('q'), 13, 32):  # q, Enter, Space
+				break
+			if key == 27:  # Esc
+				cancelled = True
+				break
 		cv2.destroyAllWindows()
+		if cancelled:
+			self.status_label.configure(text="Selection cancelled", text_color=COLORS["warning"])
+			return
 		
 		if selected[0]:
 			self.x_entry.delete(0, "end")
@@ -389,11 +506,31 @@ class SimpleOverlayTab(ctk.CTkFrame):
 	def pick_color(self):
 		"""Open color picker dialog"""
 		current_color = self.color_entry.get().strip() or "#000000"
-		pick_color = AskColor(initial_color=current_color)  # Pass current color
-		color = pick_color.get()  # Get the color hex string
+		color = _pick_color(current_color)
 		if color:
 			self.color_entry.delete(0, "end")
 			self.color_entry.insert(0, color)
+
+	def add_user_font(self):
+		"""Let user select a font file and copy it into app data."""
+		font_paths = filedialog.askopenfilenames(
+			title="Select Font File",
+			filetypes=[("Font files", "*.ttf *.otf *.ttc"), ("All files", "*.*")]
+		)
+		if not font_paths:
+			self.status_label.configure(text="Font selection cancelled", text_color=COLORS["warning"])
+			return
+		copied = _copy_user_fonts(font_paths)
+		if not copied:
+			self.status_label.configure(text="Invalid font file selected", text_color=COLORS["error"])
+			return
+		# Refresh font list
+		available_fonts = _get_available_fonts()
+		self.font_style_menu.configure(values=available_fonts if available_fonts else ["Ocraext"])
+		current = self.font_style_menu.get()
+		if current not in available_fonts and available_fonts:
+			self.font_style_menu.set(available_fonts[0])
+		self.status_label.configure(text=f"✓ Fonts added: {len(copied)}", text_color=COLORS["success"])
 	
 	def apply_overlay(self):
 		"""Apply text overlay to image"""
@@ -426,20 +563,18 @@ class SimpleOverlayTab(ctk.CTkFrame):
 			
 			color = self.color_entry.get().strip() or "black"
 			font_style = self.font_style_menu.get()
+			opacity = int(self.opacity_slider.get())
 			
 			# Ask user where to save
 			basename = os.path.basename(self.image_path)
 			name, ext = os.path.splitext(basename)
-			default_output = f"./outputs/{name}_edited{ext}"
-			
-			# Ensure outputs directory exists
-			os.makedirs("./outputs", exist_ok=True)
+			outputs_dir = fn.ensure_user_dir("outputs")
 			
 			# Ask user to choose save location
 			output_path = filedialog.asksaveasfilename(
 				title="Save Edited Image As",
 				defaultextension=ext,
-				initialdir="./outputs",
+				initialdir=outputs_dir,
 				initialfile=f"{name}_edited{ext}",
 				filetypes=[("Image files", "*.png *.jpg *.jpeg *.bmp *.gif"), ("All files", "*.*")]
 			)
@@ -448,6 +583,11 @@ class SimpleOverlayTab(ctk.CTkFrame):
 				self.status_label.configure(text="Operation cancelled", text_color=COLORS["warning"])
 				return
 			
+			# Ensure directory exists for the selected output path
+			output_dir = os.path.dirname(output_path)
+			if output_dir:
+				os.makedirs(output_dir, exist_ok=True)
+			
 			fn.create_image_with_text(
 				text=text,
 				image_path=self.image_path,
@@ -455,18 +595,31 @@ class SimpleOverlayTab(ctk.CTkFrame):
 				text_color=color,
 				font_size=font_size,
 				font_style=font_style,
-				output_path=output_path
+				output_path=output_path,
+				opacity=opacity
 			)
 			
-			# Show success message with full path
+			# Show success message with full path in UI (no popup)
 			full_path = os.path.abspath(output_path)
-			self.status_label.configure(text=f"✓ Image saved successfully", text_color=COLORS["success"])
-			messagebox.showinfo("Success", f"Image saved to:\n{full_path}")
+			self.last_output_path = full_path
+			self.status_label.configure(text=f"✓ Image saved: {full_path}", text_color=COLORS["success"])
+			self.open_output_btn.configure(state="normal")
 			
 		except ValueError as e:
 			messagebox.showerror("Invalid Input", f"Please enter valid numbers: {e}")
 		except Exception as e:
 			messagebox.showerror("Error", f"Failed to apply overlay: {e}")
+
+	def open_last_output(self):
+		"""Open the last saved output file."""
+		if not self.last_output_path or not os.path.exists(self.last_output_path):
+			self.status_label.configure(text="Output file not found", text_color=COLORS["error"])
+			self.open_output_btn.configure(state="disabled")
+			return
+		try:
+			os.startfile(self.last_output_path)
+		except Exception as e:
+			self.status_label.configure(text=f"Failed to open: {e}", text_color=COLORS["error"])
 
 
 class CreateTemplateTab(ctk.CTkFrame):
@@ -528,7 +681,7 @@ class CreateTemplateTab(ctk.CTkFrame):
 			"4. Click on the image to mark positions\n"
 			"5. Enter a label for each position\n"
 			"6. Press 'q' when done\n\n"
-			"Templates are saved to coord_templates/ folder")
+			f"Templates are saved to: {fn.get_user_data_path('coord_templates')}")
 		info.configure(state="disabled")
 		
 		# Status
@@ -578,6 +731,7 @@ class ApplyTemplateTab(ctk.CTkFrame):
 		self.font_size_entries = {}
 		self.font_color_entries = {}
 		self.font_style_entries = {}
+		self.opacity_entries = {}
 		self.original_font_data = {}  # Track original values
 		self.update_button = None  # Reference to update button
 		self.configure(fg_color=COLORS["panel"])
@@ -618,6 +772,10 @@ class ApplyTemplateTab(ctk.CTkFrame):
 		btn_refresh = ctk.CTkButton(template_frame, text="Refresh", command=self.refresh_templates, width=100)
 		style_button(btn_refresh, "secondary")
 		btn_refresh.pack(side="right", padx=5)
+
+		btn_add_font = ctk.CTkButton(template_frame, text="Add Font", command=self.add_user_font, width=100)
+		style_button(btn_add_font, "secondary")
+		btn_add_font.pack(side="right", padx=5)
 		
 		# Scrollable frame for text inputs
 		self.text_inputs_frame = ctk.CTkScrollableFrame(self, label_text="Text Fields")
@@ -632,7 +790,7 @@ class ApplyTemplateTab(ctk.CTkFrame):
 		# Buttons frame
 		buttons_frame = ctk.CTkFrame(self, fg_color="transparent")
 		buttons_frame.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
-		
+
 		# Apply button
 		btn_apply = ctk.CTkButton(buttons_frame, text="Apply Template to Image", command=self.apply_template,
 					height=40, font=ctk.CTkFont(size=14, weight="bold"))
@@ -658,8 +816,15 @@ class ApplyTemplateTab(ctk.CTkFrame):
 		self.show_preview_check.pack(anchor="w")
 		
 		# Status
-		self.status_label = ctk.CTkLabel(self, text="", text_color=COLORS["text_muted"])
-		self.status_label.grid(row=5, column=0, padx=20, pady=5)
+		self.last_output_path = None
+		status_frame = ctk.CTkFrame(self, fg_color="transparent")
+		status_frame.grid(row=5, column=0, padx=20, pady=5, sticky="ew")
+		status_frame.grid_columnconfigure(0, weight=1)
+		self.status_label = ctk.CTkLabel(status_frame, text="", text_color=COLORS["text_muted"], anchor="w")
+		self.status_label.grid(row=0, column=0, sticky="ew")
+		self.open_output_btn = ctk.CTkButton(status_frame, text="Open", width=70, command=self.open_last_output, state="disabled")
+		style_button(self.open_output_btn, "secondary")
+		self.open_output_btn.grid(row=0, column=1, padx=(10, 0))
 		
 		# Initial load
 		self.refresh_templates()
@@ -688,6 +853,29 @@ class ApplyTemplateTab(ctk.CTkFrame):
 			self.template_menu.configure(values=["No templates"])
 			self.template_menu.set("No templates")
 			self.status_label.configure(text="No templates found", text_color=COLORS["warning"])
+
+	def add_user_font(self):
+		"""Let user select a font file and copy it into app data."""
+		font_paths = filedialog.askopenfilenames(
+			title="Select Font File",
+			filetypes=[("Font files", "*.ttf *.otf *.ttc"), ("All files", "*.*")]
+		)
+		if not font_paths:
+			self.status_label.configure(text="Font selection cancelled", text_color=COLORS["warning"])
+			return
+		copied = _copy_user_fonts(font_paths)
+		if not copied:
+			self.status_label.configure(text="Invalid font file selected", text_color=COLORS["error"])
+			return
+		available_fonts = _get_available_fonts()
+		if not available_fonts:
+			available_fonts = ["Ocraext"]
+		for point_name, menu in self.font_style_entries.items():
+			current = menu.get()
+			menu.configure(values=available_fonts)
+			if current not in available_fonts:
+				menu.set(available_fonts[0])
+		self.status_label.configure(text=f"✓ Fonts added: {len(copied)}", text_color=COLORS["success"])
 	
 	def on_template_selected(self, template_name):
 		"""Load template and create input fields"""
@@ -695,7 +883,7 @@ class ApplyTemplateTab(ctk.CTkFrame):
 			return
 		
 		try:
-			template_path = f"./coord_templates/{template_name}.json"
+			template_path = fn.get_user_data_path("coord_templates", f"{template_name}.json")
 			with open(template_path, "r") as f:
 				self.template_data = json.load(f)
 			
@@ -741,6 +929,7 @@ class ApplyTemplateTab(ctk.CTkFrame):
 				font_size_val = str(point_data.get("font_size", 20))
 				font_size_entry.insert(0, font_size_val)
 				font_size_entry.pack(side="left", padx=(0, 10))
+				_bind_int_mousewheel(font_size_entry, min_value=1, on_change=self.check_for_changes)
 				self.font_size_entries[point_name] = font_size_entry
 				
 				# # Font color
@@ -754,12 +943,12 @@ class ApplyTemplateTab(ctk.CTkFrame):
 				
 				# Color picker button
 				pick_btn = ctk.CTkButton(main_frame, text="Pick", width=30,
-										 command=lambda entry=font_color_entry: self.pick_color_for_entry(entry))
+										command=lambda entry=font_color_entry: self.pick_color_for_entry(entry))
 				style_button(pick_btn, "secondary")
 				pick_btn.pack(side="left", padx=(0, 10))
 				
 				# Font style (dropdown)
-				label_style = ctk.CTkLabel(main_frame, text="Style:")
+				label_style = ctk.CTkLabel(main_frame, text="Font:")
 				style_label(label_style, muted=True)
 				label_style.pack(side="left", padx=(0, 5))
 				
@@ -786,12 +975,33 @@ class ApplyTemplateTab(ctk.CTkFrame):
 				font_style_menu.set(font_style_val)
 				font_style_menu.pack(side="left")
 				self.font_style_entries[point_name] = font_style_menu
+
+				# Opacity slider
+				label_opacity = ctk.CTkLabel(main_frame, text="Opacity:")
+				style_label(label_opacity, muted=True)
+				label_opacity.pack(side="left", padx=(10, 5))
+				opacity_val = int(point_data.get("opacity", 100))
+				opacity_slider = ctk.CTkSlider(main_frame, from_=0, to=100, number_of_steps=100, width=80,
+											   command=lambda _=None: self.check_for_changes())
+				opacity_slider.set(opacity_val)
+				opacity_slider.pack(side="left", padx=(0, 5))
+				opacity_label = ctk.CTkLabel(main_frame, text=f"{opacity_val}%", width=50)
+				style_label(opacity_label, muted=True)
+				opacity_label.pack(side="left")
+
+				def _update_opacity_label(value, lbl=opacity_label):
+					lbl.configure(text=f"{int(value)}%")
+					self.check_for_changes()
+				opacity_slider.configure(command=_update_opacity_label)
+
+				self.opacity_entries[point_name] = opacity_slider
 				
 				# Store original values for change detection
 				self.original_font_data[point_name] = {
 					"font_size": font_size_val,
 					"font_color": font_color_val,
-					"font_style": font_style_val
+					"font_style": font_style_val,
+					"opacity": str(opacity_val)
 				}
 				
 				# Bind change events to check for modifications
@@ -815,11 +1025,13 @@ class ApplyTemplateTab(ctk.CTkFrame):
 				current_size = self.font_size_entries[point_name].get().strip()
 				current_color = self.font_color_entries[point_name].get().strip()
 				current_style = self.font_style_entries[point_name].get()  # OptionMenu returns string directly
+				current_opacity = str(int(self.opacity_entries[point_name].get()))
 				
 				original = self.original_font_data[point_name]
 				if (current_size != original["font_size"] or 
 					current_color != original["font_color"] or 
-					current_style != original["font_style"]):
+					current_style != original["font_style"] or
+					current_opacity != original["opacity"]):
 					has_changes = True
 					break
 		
@@ -831,8 +1043,7 @@ class ApplyTemplateTab(ctk.CTkFrame):
 	def pick_color_for_entry(self, entry):
 		"""Open color picker dialog and update the given entry"""
 		current_color = entry.get().strip() or "#000000"
-		pick_color = AskColor(initial_color=current_color)  # Pass current color
-		color = pick_color.get()  # Get the color hex string
+		color = _pick_color(current_color)
 		if color:
 			entry.delete(0, "end")
 			entry.insert(0, color)
@@ -868,11 +1079,13 @@ class ApplyTemplateTab(ctk.CTkFrame):
 					font_size = int(self.font_size_entries[point_name].get().strip())
 					font_color = self.font_color_entries[point_name].get().strip()
 					font_style = self.font_style_entries[point_name].get()
+					opacity = int(self.opacity_entries[point_name].get())
 					
 					font_overrides[point_name] = {
 						"font_size": font_size,
 						"font_color": font_color or "black",
-						"font_style": font_style or "Ocraext"
+						"font_style": font_style or "Ocraext",
+						"opacity": opacity
 					}
 					print(f"DEBUG UI: Collected for {point_name}: size={font_size}, color={font_color}, style={font_style}")
 				except ValueError:
@@ -888,14 +1101,13 @@ class ApplyTemplateTab(ctk.CTkFrame):
 			basename = os.path.basename(self.image_path)
 			name, ext = os.path.splitext(basename)
 			
-			# Ensure outputs directory exists
-			os.makedirs("./outputs", exist_ok=True)
+			outputs_dir = fn.ensure_user_dir("outputs")
 			
 			# Ask user to choose save location
 			output_path = filedialog.asksaveasfilename(
 				title="Save Edited Image As",
 				defaultextension=ext,
-				initialdir="./outputs",
+				initialdir=outputs_dir,
 				initialfile=f"{name}_edited{ext}",
 				filetypes=[("Image files", "*.png *.jpg *.jpeg *.bmp *.gif"), ("All files", "*.*")]
 			)
@@ -903,6 +1115,11 @@ class ApplyTemplateTab(ctk.CTkFrame):
 			if not output_path:  # User cancelled
 				self.status_label.configure(text="Operation cancelled", text_color=COLORS["warning"])
 				return
+			
+			# Ensure directory exists for the selected output path
+			output_dir = os.path.dirname(output_path)
+			if output_dir:
+				os.makedirs(output_dir, exist_ok=True)
 			
 			fn.apply_template_to_image(
 				image_path=self.image_path,
@@ -919,14 +1136,27 @@ class ApplyTemplateTab(ctk.CTkFrame):
 			if os.path.exists(output_path):
 				if self.show_preview_var.get() and self.parent_app:
 					self.parent_app.show_preview_popup(output_path)
-				self.status_label.configure(text="✓ Template applied successfully", text_color=COLORS["success"])
-				messagebox.showinfo("Success", f"Image saved to:\n{full_path}")
+				self.last_output_path = full_path
+				self.status_label.configure(text=f"✓ Template applied: {full_path}", text_color=COLORS["success"])
+				self.open_output_btn.configure(state="normal")
 			else:
-				self.status_label.configure(text="✓ Template applied successfully", text_color=COLORS["success"])
-				messagebox.showinfo("Success", f"Image saved to:\n{full_path}")
+				self.last_output_path = full_path
+				self.status_label.configure(text=f"✓ Template applied: {full_path}", text_color=COLORS["success"])
+				self.open_output_btn.configure(state="normal")
 			
 		except Exception as e:
 			messagebox.showerror("Error", f"Failed to apply template: {e}")
+
+	def open_last_output(self):
+		"""Open the last saved output file."""
+		if not self.last_output_path or not os.path.exists(self.last_output_path):
+			self.status_label.configure(text="Output file not found", text_color=COLORS["error"])
+			self.open_output_btn.configure(state="disabled")
+			return
+		try:
+			os.startfile(self.last_output_path)
+		except Exception as e:
+			self.status_label.configure(text=f"Failed to open: {e}", text_color=COLORS["error"])
 	
 	def update_template(self):
 		"""Update template with modified font settings"""
@@ -960,7 +1190,8 @@ class ApplyTemplateTab(ctk.CTkFrame):
 				font_updates[point_name] = {
 					"font_size": font_size,
 					"font_color": font_color or "black",
-					"font_style": font_style or "normal"
+					"font_style": font_style or "normal",
+					"opacity": int(self.opacity_entries[point_name].get())
 				}
 			
 			# Update the template
@@ -974,7 +1205,6 @@ class ApplyTemplateTab(ctk.CTkFrame):
 				self.update_button.configure(state="disabled")
 			
 			self.status_label.configure(text=f"✓ Template '{template_name}' updated!", text_color=COLORS["success"])
-			messagebox.showinfo("Success", f"Template '{template_name}' updated successfully!")
 			
 		except Exception as e:
 			messagebox.showerror("Error", f"Failed to update template: {e}")
@@ -992,9 +1222,13 @@ class PixelTyperApp(ctk.CTk):
 		
 		# Set application icon if available
 		try:
-			icon_path = "icon.ico"  # Place icon.ico in project root
+			icon_path = "icon.ico"
 			if os.path.exists(icon_path):
 				self.iconbitmap(icon_path)
+			else:
+				bundled_icon = fn.get_resource_path("icon.ico")
+				if os.path.exists(bundled_icon):
+					self.iconbitmap(bundled_icon)
 		except Exception as e:
 			print(f"Could not load icon: {e}")
 		
@@ -1078,7 +1312,7 @@ class PixelTyperApp(ctk.CTk):
 			
 			# Display image
 			photo = ctk.CTkImage(light_image=img_resized, dark_image=img_resized, 
-								   size=(new_width, new_height))
+								size=(new_width, new_height))
 			label = ctk.CTkLabel(popup, image=photo, text="")
 			label.pack(padx=20, pady=20)
 			

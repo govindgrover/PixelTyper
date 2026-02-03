@@ -19,7 +19,7 @@ PixelTyper is an image text overlay tool that provides two interfaces for users:
 
 - **Template System:**
   - Create reusable templates with named positions and font settings.
-  - Save templates as JSON files in the `coord_templates/` directory.
+  - Save templates as JSON files in the app data directory.
   - Apply templates to images for batch text overlay.
 
 - **Dynamic GUI:**
@@ -32,7 +32,7 @@ PixelTyper is an image text overlay tool that provides two interfaces for users:
   - Default font fallback to ensure compatibility.
 
 - **Output Management:**
-  - All processed images are saved in the `outputs/` directory.
+  - All processed images are saved in the app data directory.
   - File naming convention: `_editied-{original_filename}.jpg` (typo preserved for consistency).
 
 ---
@@ -70,10 +70,13 @@ PixelTyper/
 ├── functions.py         # Core image processing library
 ├── test.py              # CLI usage examples
 ├── UI.py                # CustomTkinter GUI implementation
-├── coord_templates/     # Directory for storing JSON templates
 ├── fonts/               # Directory for custom font files
-├── outputs/             # Directory (Default) for processed images
 ```
+User data (templates and outputs) is stored per-OS in the app data directory:
+1. Windows: `%APPDATA%\PixelTyper`
+2. macOS: `~/Library/Application Support/PixelTyper`
+3. Linux: `~/.local/share/PixelTyper`
+
 
 ---
 

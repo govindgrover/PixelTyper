@@ -8,7 +8,7 @@ print(fn.list_templates())
 file = './testimg.png'
 print("Using test image file:", file)
 
-output_path = './outputs/testimg_edited.jpg'
+output_path = fn.get_user_data_path("outputs", "testimg_edited.jpg")
 fn.create_image_with_text(
     text="Hello, World!",
     image_path=file,
@@ -34,10 +34,11 @@ text_mapping = {
     "name_field": "John Doe",
     "date_field": "2026-02-03"
 }
+template_output_path = fn.get_user_data_path("outputs", "testimg_template_applied.jpg")
 fn.apply_template_to_image(
     image_path=file,
     template_name="test_template",
     text_mapping=text_mapping,
-    output_path="./outputs/testimg_template_applied.jpg"
+    output_path=template_output_path
 )
-print("Template applied and image saved to ./outputs/testimg_template_applied.jpg")
+print(f"Template applied and image saved to {template_output_path}")
