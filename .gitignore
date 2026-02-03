@@ -29,7 +29,6 @@ wheels/
 /.venv
 /outputs
 /testimg.png
-/test.py
 coord_templates/
 
 __pycache__/*.pyc
