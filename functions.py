@@ -103,3 +103,123 @@ def make_coordinates_template(image_path, max_width=1280, max_height=720) -> Non
 		json.dump(points, f, indent=4)
 	print(f"Template saved as {template_name}.json")
 
+def apply_template_to_image(image_path, template_name, text_mapping: dict, text_color=(0, 0, 0), font_size=20) -> Image.Image:
+	"""
+	Apply multiple texts to an image using a saved coordinate template.
+	
+	Args:
+		image_path: Path to the image
+		template_name: Name of the template (without .json extension)
+		text_mapping: Dictionary mapping point names to text strings
+			Example: {"name": "John Doe", "date": "2025-01-01"}
+		text_color: Color of the text (RGB tuple or color name)
+		font_size: Size of the font
+	
+	Returns:
+		Image.Image: The edited image
+	"""
+	# Load the template
+	template_path = f"./coord_templates/{template_name}.json"
+	if not os.path.exists(template_path):
+		raise FileNotFoundError(f"Template not found: {template_path}")
+	
+	with open(template_path, "r") as f:
+		coords = json.load(f)
+	
+	# Load image
+	image = Image.open(image_path).convert("RGB")
+	draw = ImageDraw.Draw(image)
+	
+	# Load font
+	try:
+		font = ImageFont.truetype(CONFIG["fonts"]["Ocraext"]["normal"], font_size)
+	except IOError:
+		font = ImageFont.load_default()
+	
+	# Apply each text to its named coordinate
+	for point_name, text in text_mapping.items():
+		if point_name not in coords:
+			print(f"Warning: Point '{point_name}' not found in template, skipping")
+			continue
+		
+		position = (coords[point_name]["x"], coords[point_name]["y"])
+		draw.text(position, text, fill=text_color, font=font)
+		print(f"Applied '{text}' at {point_name} {position}")
+	
+	# Save the image
+	output_path = f"./outputs/_editied-{os.path.basename(image_path)}"
+	image.save(output_path)
+	print(f"Image saved to {output_path}")
+	
+	return image
+
+def apply_template_interactive(image_path, template_name, text_color=(0, 0, 0), font_size=20) -> Image.Image:
+	"""
+	Interactive version - prompts user for text for each coordinate in template.
+	
+	Args:
+		image_path: Path to the image
+		template_name: Name of the template (without .json extension)
+		text_color: Color of the text
+		font_size: Size of the font
+	
+	Returns:
+		Image.Image: The edited image
+	"""
+	# Load the template
+	template_path = f"./coord_templates/{template_name}.json"
+	if not os.path.exists(template_path):
+		raise FileNotFoundError(f"Template not found: {template_path}")
+	
+	with open(template_path, "r") as f:
+		coords = json.load(f)
+	
+	# Setup Tkinter for dialogs
+	root = tk.Tk()
+	root.withdraw()
+	
+	# Collect text for each coordinate
+	text_mapping = {}
+	for point_name, point_data in coords.items():
+		text = simpledialog.askstring(
+			"Enter Text", 
+			f"Enter text for '{point_name}' at ({point_data['x']}, {point_data['y']}):",
+			parent=root
+		)
+		if text and text.strip():
+			text_mapping[point_name] = text
+	
+	root.destroy()
+	
+	# Use the main function to apply texts
+	return apply_template_to_image(image_path, template_name, text_mapping, text_color, font_size)
+
+def list_templates(_print=False) -> list:
+	"""
+	List all available coordinate templates.
+	
+	Args:
+		show_details: If True, prints coordinate names for each template
+	
+	Returns:
+		list: List of template names (without .json extension)
+	"""
+	templates_dir = "./coord_templates"
+	
+	if not os.path.exists(templates_dir):
+		print("No templates directory found.")
+		return []
+	
+	templates = [f.replace(".json", "") for f in os.listdir(templates_dir) if f.endswith(".json")]
+	
+	if not templates:
+		print("No templates found.")
+		return []
+	
+	if _print:
+		print(f"\nFound {len(templates)} template(s):")
+		for template_name in templates:
+			print(f"  - {template_name}")
+			
+	return templates
+
