@@ -162,6 +162,10 @@ def make_coordinates_template(image_path, template_name, max_width=1280, max_hei
 		display_img = img.copy()
 		scale = 1.0
 	
+	font_size = 20
+	font_color = "black"
+	font_style = "Ocraext"
+
 	# This function will be called whenever a mouse event happens
 	def click_event(event, x, y, flags, params):
 		if event == cv2.EVENT_LBUTTONDOWN:
@@ -174,18 +178,18 @@ def make_coordinates_template(image_path, template_name, max_width=1280, max_hei
 			if label is None or label.strip() == "":
 				print("No label provided, point ignored.")
 				return
+
+			# # Ask for font size
+			# font_size_str = simpledialog.askstring("Font Size", f"Font size for '{label}' (default: 20):", parent=root)
+			# font_size = int(font_size_str) if font_size_str and font_size_str.strip() else 20
 			
-			# Ask for font size
-			font_size_str = simpledialog.askstring("Font Size", f"Font size for '{label}' (default: 20):", parent=root)
-			font_size = int(font_size_str) if font_size_str and font_size_str.strip() else 20
+			# # Ask for font color
+			# font_color = simpledialog.askstring("Font Color", f"Font color for '{label}' (default: black):", parent=root)
+			# font_color = font_color.strip() if font_color and font_color.strip() else "black"
 			
-			# Ask for font color
-			font_color = simpledialog.askstring("Font Color", f"Font color for '{label}' (default: black):", parent=root)
-			font_color = font_color.strip() if font_color and font_color.strip() else "black"
-			
-			# Ask for font style - user can enter any font name from config, ./fonts/, or system
-			font_style = simpledialog.askstring("Font Style", f"Font for '{label}' (e.g., Ocraext, Arial, or filename without extension, default: Ocraext):", parent=root)
-			font_style = font_style.strip() if font_style and font_style.strip() else "Ocraext"
+			# # Ask for font style - user can enter any font name from config, ./fonts/, or system
+			# font_style = simpledialog.askstring("Font Style", f"Font for '{label}' (e.g., Ocraext, Arial, or filename without extension, default: Ocraext):", parent=root)
+			# font_style = font_style.strip() if font_style and font_style.strip() else "Ocraext"
 
 			# Store ORIGINAL coordinates with font properties
 			points[label] = {

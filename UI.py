@@ -69,24 +69,24 @@ def _get_theme():
 	default_theme = {
 		"appearance_mode": "dark",
 		"colors": {
-			"bg": "#0f1115",
-			"panel": "#151922",
-			"surface": "#1d2230",
-			"surface_alt": "#1a1f2b",
-			"accent": "#3b82f6",
-			"accent_hover": "#2563eb",
-			"text": "#e5e7eb",
-			"text_muted": "#9ca3af",
-			"border": "#2b3140",
-			"success": "#22c55e",
-			"warning": "#f59e0b",
-			"error": "#ef4444"
+			"bg": "#121417",           
+			"panel": "#1a1d23",        
+			"surface": "#242933",      
+			"surface_alt": "#1e232d",  
+			"accent": "#818cf8",       
+			"accent_hover": "#6366f1", 
+			"text": "#f3f4f6",         
+			"text_muted": "#94a3b8",   
+			"border": "#334155",       
+			"success": "#10b981",      
+			"warning": "#f59e0b",      
+			"error": "#f43f5e"         
 		},
 		"radii": {
-			"panel": 12,
+			"panel": 16,               
 			"input": 8,
-			"button": 10
-		}
+			"button": 12               
+		}	
 	}
 	merged = default_theme
 	if isinstance(theme, dict):
@@ -517,7 +517,7 @@ class CreateTemplateTab(ctk.CTkFrame):
 		btn_create.grid(row=3, column=0, padx=20, pady=20, sticky="ew")
 		
 		# Info text
-		info = ctk.CTkTextbox(self, height=100, fg_color=COLORS["surface"])
+		info = ctk.CTkTextbox(self, height=200, fg_color=COLORS["surface"])
 		info.grid(row=4, column=0, padx=20, pady=10, sticky="ew")
 		info.configure(text_color=COLORS["text"], border_width=1, border_color=COLORS["border"])
 		info.insert("1.0", 
