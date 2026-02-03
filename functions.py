@@ -9,7 +9,91 @@ from tkinter import simpledialog, filedialog
 
 CONFIG: dict = json.load(open("config.json", "r"))
 
-def create_image_with_text(text, image_path, position: tuple =(), text_color=(0, 0, 0), font_size=20) -> Image.Image:
+def _load_font(font_name, font_size=20):
+	"""Load font from config, ./fonts/ directory, or system fonts"""
+	if font_name == "default" or not font_name:
+		return ImageFont.load_default()
+	
+	import platform
+	
+	try:
+		# 1. Check if it's in config
+		if font_name in CONFIG.get("fonts", {}):
+			font_variants = CONFIG["fonts"][font_name]
+			font_path = next(iter(font_variants.values()))
+			return ImageFont.truetype(font_path, font_size)
+		
+		# 2. Check ./fonts/ directory for matching .ttf/.otf file
+		for ext in ['.ttf', '.TTF', '.otf', '.OTF']:
+			local_path = f"./fonts/{font_name}{ext}"
+			if os.path.exists(local_path):
+				return ImageFont.truetype(local_path, font_size)
+		
+		# 3. Check if it's a system font (prefixed with [System])
+		if font_name.startswith("[System] "):
+			system_font_name = font_name.replace("[System] ", "")
+			system = platform.system()
+			
+			if system == "Windows":
+				# Windows fonts are in C:\Windows\Fonts
+				# Try common variations
+				font_variations = [
+					f"C:\\Windows\\Fonts\\{system_font_name.replace(' ', '')}.ttf",
+					f"C:\\Windows\\Fonts\\{system_font_name}.ttf",
+					f"C:\\Windows\\Fonts\\{system_font_name.lower().replace(' ', '')}.ttf",
+					f"C:\\Windows\\Fonts\\times.ttf",  # Times New Roman -> times.ttf
+					f"C:\\Windows\\Fonts\\timesbd.ttf",  # Times New Roman Bold
+					f"C:\\Windows\\Fonts\\arial.ttf",  # Arial
+					f"C:\\Windows\\Fonts\\cour.ttf",  # Courier New
+					f"C:\\Windows\\Fonts\\verdana.ttf",  # Verdana
+				]
+				
+				# Special mappings for common fonts
+				font_map = {
+					"Times New Roman": ["times.ttf", "timesbd.ttf"],
+					"Arial": ["arial.ttf", "arialbd.ttf"],
+					"Courier New": ["cour.ttf", "courbd.ttf"],
+					"Comic Sans MS": ["comic.ttf", "comicbd.ttf"],
+					"Georgia": ["georgia.ttf", "georgiab.ttf"],
+					"Verdana": ["verdana.ttf", "verdanab.ttf"],
+					"Trebuchet MS": ["trebuc.ttf", "trebucbd.ttf"],
+					"Tahoma": ["tahoma.ttf", "tahomabd.ttf"],
+					"Impact": ["impact.ttf"]
+				}
+				
+				if system_font_name in font_map:
+					for font_file in font_map[system_font_name]:
+						system_path = f"C:\\Windows\\Fonts\\{font_file}"
+						if os.path.exists(system_path):
+							print(f"DEBUG: Loading Windows font: {system_path}")
+							return ImageFont.truetype(system_path, font_size)
+				
+				# Try all variations
+				for path in font_variations:
+					if os.path.exists(path):
+						print(f"DEBUG: Loading Windows font: {path}")
+						return ImageFont.truetype(path, font_size)
+			elif system == "Darwin":  # macOS
+				# Try system fonts
+				for fonts_dir in ["/System/Library/Fonts", "/Library/Fonts"]:
+					system_path = f"{fonts_dir}/{system_font_name}.ttf"
+					if os.path.exists(system_path):
+						return ImageFont.truetype(system_path, font_size)
+					system_path = f"{fonts_dir}/{system_font_name}.ttc"
+					if os.path.exists(system_path):
+						return ImageFont.truetype(system_path, font_size)
+		
+		# Fallback: if no extension match, try as-is (maybe full path)
+		if os.path.exists(font_name):
+			return ImageFont.truetype(font_name, font_size)
+		
+	except Exception as e:
+		print(f"Warning: Could not load font '{font_name}': {e}")
+	
+	# Final fallback
+	return ImageFont.load_default()
+
+def create_image_with_text(text, image_path, position: tuple =(), text_color=(0, 0, 0), font_size=20, font_style="Ocraext", output_path=None) -> Image.Image:
 	# Create a new image with the specified background color
 	image = Image.open(image_path).convert("RGB")
 	
@@ -17,10 +101,7 @@ def create_image_with_text(text, image_path, position: tuple =(), text_color=(0,
 	draw = ImageDraw.Draw(image)
 	
 	# Load a font
-	try:
-		font = ImageFont.truetype(CONFIG["fonts"]["Ocraext"]["normal"], font_size)
-	except IOError:
-		font = ImageFont.load_default()
+	font = _load_font(font_style, font_size)
 
 	# Validate inputs
 	if not text or not isinstance(text, str):
@@ -34,9 +115,14 @@ def create_image_with_text(text, image_path, position: tuple =(), text_color=(0,
 	# Draw the text onto the image
 	draw.text(position, text, fill=text_color, font=font)
 	# image.show()
-	basename = os.path.basename(image_path)
-	name, ext = os.path.splitext(basename)
-	output_path = f"./outputs/{name}_edited{ext}"
+	
+	# Use custom output path if provided, otherwise use default
+	if output_path is None:
+		basename = os.path.basename(image_path)
+		name, ext = os.path.splitext(basename)
+		output_path = f"./outputs/{name}_edited{ext}"
+		os.makedirs("./outputs", exist_ok=True)
+	
 	image.save(output_path)
 	print(f"Image saved to {output_path}")
 
@@ -97,9 +183,9 @@ def make_coordinates_template(image_path, template_name, max_width=1280, max_hei
 			font_color = simpledialog.askstring("Font Color", f"Font color for '{label}' (default: black):", parent=root)
 			font_color = font_color.strip() if font_color and font_color.strip() else "black"
 			
-			# Ask for font style
-			font_style = simpledialog.askstring("Font Style", f"Font style for '{label}' (normal/bold/italic, default: normal):", parent=root)
-			font_style = font_style.strip() if font_style and font_style.strip() else "normal"
+			# Ask for font style - user can enter any font name from config, ./fonts/, or system
+			font_style = simpledialog.askstring("Font Style", f"Font for '{label}' (e.g., Ocraext, Arial, or filename without extension, default: Ocraext):", parent=root)
+			font_style = font_style.strip() if font_style and font_style.strip() else "Ocraext"
 
 			# Store ORIGINAL coordinates with font properties
 			points[label] = {
@@ -132,7 +218,7 @@ def make_coordinates_template(image_path, template_name, max_width=1280, max_hei
 		json.dump(points, f, indent=4)
 	print(f"Template saved as {template_name}.json")
 
-def apply_template_to_image(image_path, template_name, text_mapping: dict, text_color=(0, 0, 0), font_size=20) -> Image.Image:
+def apply_template_to_image(image_path, template_name, text_mapping: dict, text_color=(0, 0, 0), font_size=20, font_overrides=None, output_path=None) -> Image.Image:
 	"""
 	Apply multiple texts to an image using a saved coordinate template.
 	
@@ -143,6 +229,8 @@ def apply_template_to_image(image_path, template_name, text_mapping: dict, text_
 			Example: {"name": "John Doe", "date": "2025-01-01"}
 		text_color: Color of the text (RGB tuple or color name)
 		font_size: Size of the font
+		font_overrides: Optional dict mapping point names to font settings to override template
+			Example: {"name": {"font_size": 25, "font_color": "red", "font_style": "Arial"}}
 	
 	Returns:
 		Image.Image: The edited image
@@ -167,6 +255,10 @@ def apply_template_to_image(image_path, template_name, text_mapping: dict, text_
 	image = Image.open(image_path).convert("RGB")
 	draw = ImageDraw.Draw(image)
 	
+	# Debug: Print font overrides
+	if font_overrides:
+		print(f"DEBUG: Font overrides received: {font_overrides}")
+	
 	# Apply each text to its named coordinate
 	for point_name, text in text_mapping.items():
 		if point_name not in coords:
@@ -176,25 +268,33 @@ def apply_template_to_image(image_path, template_name, text_mapping: dict, text_
 		point_data = coords[point_name]
 		position = (point_data["x"], point_data["y"])
 		
-		# Use point-specific font settings if available, otherwise use defaults
-		point_font_size = point_data.get("font_size", font_size)
-		point_color = point_data.get("font_color", text_color)
-		point_style = point_data.get("font_style", "normal")
+		# Check if there are overrides for this point
+		if font_overrides and point_name in font_overrides:
+			overrides = font_overrides[point_name]
+			point_font_size = overrides.get("font_size", point_data.get("font_size", font_size))
+			point_color = overrides.get("font_color", point_data.get("font_color", text_color))
+			point_style = overrides.get("font_style", point_data.get("font_style", "Ocraext"))
+			print(f"DEBUG: Using overrides for {point_name}: size={point_font_size}, color={point_color}, style={point_style}")
+		else:
+			# Use point-specific font settings if available, otherwise use defaults
+			point_font_size = point_data.get("font_size", font_size)
+			point_color = point_data.get("font_color", text_color)
+			point_style = point_data.get("font_style", "Ocraext")
+			print(f"DEBUG: Using template defaults for {point_name}: size={point_font_size}, color={point_color}, style={point_style}")
 		
 		# Load font with point-specific size
-		try:
-			# TODO: Support font_style (bold/italic) by loading different font files
-			font = ImageFont.truetype(CONFIG["fonts"]["Ocraext"]["normal"], point_font_size)
-		except IOError:
-			font = ImageFont.load_default()
+		font = _load_font(point_style, point_font_size)
 		
 		draw.text(position, text, fill=point_color, font=font)
 		print(f"Applied '{text}' at {point_name} {position} with {point_font_size}px {point_color} font")
 	
-	# Save the image (overwrites if exists)
-	basename = os.path.basename(image_path)
-	name, ext = os.path.splitext(basename)
-	output_path = f"./outputs/{name}_edited{ext}"
+	# Use custom output path if provided, otherwise use default
+	if output_path is None:
+		basename = os.path.basename(image_path)
+		name, ext = os.path.splitext(basename)
+		output_path = f"./outputs/{name}_edited{ext}"
+		os.makedirs("./outputs", exist_ok=True)
+	
 	image.save(output_path)
 	print(f"Image saved to {output_path}")
 	
