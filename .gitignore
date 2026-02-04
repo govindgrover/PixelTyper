@@ -32,3 +32,6 @@ wheels/
 coord_templates/
 
 __pycache__/*.pyc
+
+fonts/*.ttf
+fonts/*.otf
