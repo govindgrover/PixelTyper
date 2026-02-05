@@ -1,5 +1,9 @@
 # PixelTyper
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Version](https://img.shields.io/badge/version-1.0-green.svg)](https://github.com/govindgrover/PixelTyper)
+
 ## Version: v1.0
 
 PixelTyper is an image text overlay tool that provides two interfaces for users:
@@ -131,7 +135,15 @@ Contributions are welcome! To contribute:
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+### What this means:
+- ✅ **Free to use:** Use this software for any purpose, including commercial projects
+- ✅ **Free to modify:** Change and adapt the code to your needs
+- ✅ **Free to distribute:** Share the original or modified versions
+- ✅ **Free to sublicense:** Include in your own projects with different licenses
+- ⚠️ **Attribution required:** Include the original copyright notice and license
+- ⚠️ **No warranty:** Software is provided "as is" without any guarantees
 
 ---
 
