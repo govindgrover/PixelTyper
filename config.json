@@ -2,7 +2,7 @@
 	"app_name": "PixelTyper",
 	"app_version": "1.0",
 	"debug": "false",
-	"update_url": "",
+	"update_url": "https://raw.githubusercontent.com/govindgrover/PixelTyper/refs/heads/gh-pages/latest.json",
 	"fonts": {
 	},
 	"ui_theme": {
