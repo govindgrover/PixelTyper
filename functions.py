@@ -277,7 +277,9 @@ def make_coordinates_template(image_path, template_name, max_width=1280, max_hei
 
 	def _draw_instructions(target_img):
 		instruction = "Left click: add point | Enter/Space: finish | Esc: cancel"
+		cv2.putText(target_img, instruction, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2+2, cv2.LINE_AA)
 		cv2.putText(target_img, instruction, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+
 
 	# This function will be called whenever a mouse event happens
 	def click_event(event, x, y, flags, params):

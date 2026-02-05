@@ -503,6 +503,7 @@ class SimpleOverlayTab(ctk.CTkFrame):
 
 		def _draw_instructions(target_img):
 			instruction = "Left click: select | Enter/Space: finish | Esc: cancel"
+			cv2.putText(target_img, instruction, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2+2, cv2.LINE_AA)
 			cv2.putText(target_img, instruction, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 		
 		def click_event(event, x, y, flags, params):
@@ -840,7 +841,7 @@ class ApplyTemplateTab(ctk.CTkFrame):
 		# Show preview checkbox
 		preview_frame = ctk.CTkFrame(self, fg_color="transparent")
 		preview_frame.grid(row=4, column=0, padx=20, pady=5, sticky="ew")
-		self.show_preview_var = ctk.BooleanVar(value=True)
+		self.show_preview_var = ctk.BooleanVar(value=False)
 		self.show_preview_check = ctk.CTkCheckBox(
 			preview_frame,
 			text="Show preview popup after applying",
