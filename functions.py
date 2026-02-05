@@ -1,5 +1,3 @@
-from datetime import date
-
 from PIL import Image, ImageDraw, ImageFont, ImageColor
 import cv2
 import json, os
@@ -7,7 +5,7 @@ import sys, platform
 import shutil
 
 import tkinter as tk
-from tkinter import simpledialog, filedialog
+from tkinter import simpledialog
 
 def get_resource_path(relative_path):
 	"""Get absolute path to resource, works for dev and for PyInstaller bundle"""
