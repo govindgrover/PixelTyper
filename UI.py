@@ -373,7 +373,7 @@ class SimpleOverlayTab(ctk.CTkFrame):
 		style_label(label_font, muted=True)
 		label_font.pack(side="left", padx=10)
 		available_fonts = _get_available_fonts()
-		self.font_style_menu = ctk.CTkOptionMenu(style_inner, values=available_fonts if available_fonts else ["Ocraext"], width=120)
+		self.font_style_menu = ctk.CTkOptionMenu(style_inner, values=available_fonts if available_fonts else ["default"], width=120)
 		self.font_style_menu.configure(
 			fg_color=COLORS["surface_alt"],
 			button_color=COLORS["accent"],
@@ -383,7 +383,7 @@ class SimpleOverlayTab(ctk.CTkFrame):
 			dropdown_hover_color=COLORS["surface_alt"],
 			dropdown_text_color=COLORS["text"]
 		)
-		self.font_style_menu.set(available_fonts[0] if available_fonts else "Ocraext")
+		self.font_style_menu.set(available_fonts[0] if available_fonts else "default")
 		self.font_style_menu.pack(side="left", padx=5)
 
 		# Add font button
@@ -526,7 +526,7 @@ class SimpleOverlayTab(ctk.CTkFrame):
 			return
 		# Refresh font list
 		available_fonts = _get_available_fonts()
-		self.font_style_menu.configure(values=available_fonts if available_fonts else ["Ocraext"])
+		self.font_style_menu.configure(values=available_fonts if available_fonts else ["default"])
 		current = self.font_style_menu.get()
 		if current not in available_fonts and available_fonts:
 			self.font_style_menu.set(available_fonts[0])
@@ -869,7 +869,7 @@ class ApplyTemplateTab(ctk.CTkFrame):
 			return
 		available_fonts = _get_available_fonts()
 		if not available_fonts:
-			available_fonts = ["Ocraext"]
+			available_fonts = ["default"]
 		for point_name, menu in self.font_style_entries.items():
 			current = menu.get()
 			menu.configure(values=available_fonts)
@@ -954,13 +954,13 @@ class ApplyTemplateTab(ctk.CTkFrame):
 				
 				# Get available fonts from all sources
 				available_fonts = _get_available_fonts()
-				font_style_val = point_data.get("font_style", "Ocraext")
+				font_style_val = point_data.get("font_style", "default")
 				# Fallback to first available font if saved font not found
 				if font_style_val not in available_fonts and available_fonts:
 					font_style_val = available_fonts[0]
 				elif not available_fonts:
-					available_fonts = ["Ocraext"]
-					font_style_val = "Ocraext"
+					available_fonts = ["default"]
+					font_style_val = "default"
 				
 				font_style_menu = ctk.CTkOptionMenu(main_frame, values=available_fonts, width=100, command=lambda _: self.check_for_changes())
 				font_style_menu.configure(
@@ -1084,7 +1084,7 @@ class ApplyTemplateTab(ctk.CTkFrame):
 					font_overrides[point_name] = {
 						"font_size": font_size,
 						"font_color": font_color or "black",
-						"font_style": font_style or "Ocraext",
+						"font_style": font_style or "default",
 						"opacity": opacity
 					}
 					print(f"DEBUG UI: Collected for {point_name}: size={font_size}, color={font_color}, style={font_style}")

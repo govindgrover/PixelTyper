@@ -190,7 +190,7 @@ def _load_font(font_name, font_size=20):
 	# Final fallback
 	return ImageFont.load_default()
 
-def create_image_with_text(text, image_path, position: tuple =(), text_color=(0, 0, 0), font_size=20, font_style="Ocraext", output_path=None, opacity=100) -> Image.Image:
+def create_image_with_text(text, image_path, position: tuple =(), text_color=(0, 0, 0), font_size=20, font_style="default", output_path=None, opacity=100) -> Image.Image:
 	# Create a new image with the specified background color
 	image = Image.open(image_path).convert("RGB")
 	
@@ -269,7 +269,7 @@ def make_coordinates_template(image_path, template_name, max_width=1280, max_hei
 	
 	font_size = 20
 	font_color = "black"
-	font_style = "Ocraext"
+	font_style = "default"
 
 	def _draw_instructions(target_img):
 		instruction = "Left click: add point | Enter/Space: finish | Esc: cancel"
@@ -297,8 +297,8 @@ def make_coordinates_template(image_path, template_name, max_width=1280, max_hei
 			# font_color = font_color.strip() if font_color and font_color.strip() else "black"
 			
 			# # Ask for font style - user can enter any font name from config, ./fonts/, or system
-			# font_style = simpledialog.askstring("Font Style", f"Font for '{label}' (e.g., Ocraext, Arial, or filename without extension, default: Ocraext):", parent=root)
-			# font_style = font_style.strip() if font_style and font_style.strip() else "Ocraext"
+			# font_style = simpledialog.askstring("Font Style", f"Font for '{label}' (e.g., Arial, or filename without extension, default: default):", parent=root)
+			# font_style = font_style.strip() if font_style and font_style.strip() else "default"
 
 			# Store ORIGINAL coordinates with font properties
 			points[label] = {
@@ -403,14 +403,14 @@ def apply_template_to_image(image_path, template_name, text_mapping: dict, text_
 			overrides = font_overrides[point_name]
 			point_font_size = overrides.get("font_size", point_data.get("font_size", font_size))
 			point_color = overrides.get("font_color", point_data.get("font_color", text_color))
-			point_style = overrides.get("font_style", point_data.get("font_style", "Ocraext"))
+			point_style = overrides.get("font_style", point_data.get("font_style", "default"))
 			point_opacity = overrides.get("opacity", point_data.get("opacity", opacity))
 			print(f"DEBUG: Using overrides for {point_name}: size={point_font_size}, color={point_color}, style={point_style}")
 		else:
 			# Use point-specific font settings if available, otherwise use defaults
 			point_font_size = point_data.get("font_size", font_size)
 			point_color = point_data.get("font_color", text_color)
-			point_style = point_data.get("font_style", "Ocraext")
+			point_style = point_data.get("font_style", "default")
 			point_opacity = point_data.get("opacity", opacity)
 			print(f"DEBUG: Using template defaults for {point_name}: size={point_font_size}, color={point_color}, style={point_style}")
 		

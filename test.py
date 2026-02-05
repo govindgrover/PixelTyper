@@ -15,7 +15,7 @@ fn.create_image_with_text(
     position=(50, 50),  # Example position
     text_color="black",
     font_size=30,
-    font_style="Ocraext",
+    font_style="default",
     output_path=output_path
 )
 print(f"Image saved to {output_path}")

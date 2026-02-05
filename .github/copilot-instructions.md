@@ -10,7 +10,7 @@ PixelTyper is an image text overlay tool with two interfaces:
 1. **GUI** ([UI.py](../UI.py)): CustomTkinter-based desktop app with three modes (simple overlay, template creation, template application)
 2. **CLI/Programmatic** ([functions.py](../functions.py)): Core library for scripting/automation
 
-**Core workflow:** Select image → place text at coordinates → save to `outputs/_editied-{filename}.jpg`
+**Core workflow:** Select image -> place text at coordinates -> save to `outputs/{name}_edited{ext}`
 
 ## Architecture
 
@@ -47,15 +47,14 @@ Created via interactive clicking (`make_coordinates_template`), applied programm
 - **Always use returned/stored coordinates directly** - they're already in original scale
 
 ### Output File Naming
-**Hardcoded typo preserved for consistency:** `_editied-{basename}` (not "edited")
-- All functions save to `./outputs/_editied-{original_filename}.jpg`
-- Pattern used in [functions.py:27](../functions.py#L27), [UI.py:232](../UI.py#L232), [UI.py:510](../UI.py#L510)
+- All functions save to `./outputs/{name}_edited{ext}`
+- Pattern used in [functions.py:218](../functions.py#L218) and [UI.py:578](../UI.py#L578)
 
 ### Font Configuration
-- [config.json](../config.json) stores font paths: `CONFIG["fonts"]["Ocraext"]["normal"]`
-- Currently hardcoded to Ocraext font at [functions.py:18](../functions.py#L18)
-- Falls back to PIL default font silently if TTF not found (no error)
-- To add fonts: place `.TTF` in `fonts/`, add JSON entry, update loading logic
+- [config.json](../config.json) stores font paths (can be empty)
+- Defaults to Pillow's built-in `default` font when no font is specified or found
+- Fonts can be loaded from app data `fonts/`, bundled `fonts/`, system fonts, or full file paths
+- To add fonts: place `.TTF/.OTF` in `fonts/`, add JSON entry, or select via UI
 
 ### CV2 + Tkinter Integration
 **Unique pattern in [functions.py:33-86](../functions.py#L33-L86):**
@@ -131,10 +130,10 @@ Each tab is a self-contained `CTkFrame` subclass:
 Extend structure to support variants (bold/italic):
 ```python
 # config.json
-{"fonts": {"Ocraext": {"normal": "...", "bold": "..."}}}
+{"fonts": {"MyFont": {"normal": "...", "bold": "..."}}}
 
 # functions.py
-font = ImageFont.truetype(CONFIG["fonts"]["Ocraext"]["bold"], font_size)
+font = ImageFont.truetype(CONFIG["fonts"]["MyFont"]["bold"], font_size)
 ```
 
 ### Multi-Text Single Image
@@ -145,7 +144,7 @@ img = fn.apply_template_to_image(img, "template", {...})  # Modify to accept Ima
 ```
 
 ### Preview Before Save
-Uncomment `image.show()` at [functions.py:24](../functions.py#L24) for PIL preview window
+Uncomment `image.show()` near [functions.py:214](../functions.py#L214) for PIL preview window
 
 ### Custom Output Directory
 Modify all three output path constructions to use configurable directory instead of `./outputs/`
