@@ -7,12 +7,34 @@ import json
 import functions as fn
 import shutil
 import platform
+import re
+import threading
+import webbrowser
+import urllib.request
 from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
 	from __main__ import PixelTyperApp
 
 CONFIG = fn.CONFIG  # Import CONFIG for font access
+APP_VERSION = "1.0"
+UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000  # 6 hours
+
+
+def _parse_version(version_str: str) -> tuple:
+	parts = re.findall(r"\d+", str(version_str))
+	if not parts:
+		return (0,)
+	return tuple(int(p) for p in parts)
+
+
+def _is_newer_version(remote: str, local: str) -> bool:
+	remote_parts = _parse_version(remote)
+	local_parts = _parse_version(local)
+	max_len = max(len(remote_parts), len(local_parts))
+	remote_parts = remote_parts + (0,) * (max_len - len(remote_parts))
+	local_parts = local_parts + (0,) * (max_len - len(local_parts))
+	return remote_parts > local_parts
 
 
 def _get_available_fonts():
@@ -1250,6 +1272,19 @@ class PixelTyperApp(ctk.CTk):
 					font=ctk.CTkFont(size=24, weight="bold"))
 		style_label(label_title)
 		label_title.pack(side="left", padx=10)
+
+		# Update banner (hidden by default)
+		self.update_bar = ctk.CTkFrame(header_frame, fg_color=COLORS["surface_alt"], corner_radius=RADII["button"])
+		self.update_label = ctk.CTkLabel(self.update_bar, text="", text_color=COLORS["text"])
+		self.update_label.pack(side="left", padx=(10, 6), pady=6)
+		self.update_action_btn = ctk.CTkButton(self.update_bar, text="Download", width=90, command=self.open_update_url)
+		style_button(self.update_action_btn, "secondary")
+		self.update_action_btn.pack(side="left", padx=(0, 6), pady=6)
+		self.update_dismiss_btn = ctk.CTkButton(self.update_bar, text="Later", width=70, command=self.dismiss_update_banner)
+		style_button(self.update_dismiss_btn, "ghost")
+		self.update_dismiss_btn.pack(side="left", padx=(0, 10), pady=6)
+		self.update_bar.pack_forget()
+		self._update_url = None
 		
 		# Tabview
 		self.tabview = ctk.CTkTabview(main_frame)
@@ -1277,6 +1312,9 @@ class PixelTyperApp(ctk.CTk):
 		
 		self.apply_template_tab = ApplyTemplateTab(self.tab_apply, parent_app=self)
 		self.apply_template_tab.pack(fill="both", expand=True)
+
+		# Kick off update checks (non-blocking)
+		self.schedule_update_check(initial_delay_ms=1500)
 	
 	def show_preview_popup(self, image_path):
 		"""Show image preview in a popup window"""
@@ -1324,6 +1362,61 @@ class PixelTyperApp(ctk.CTk):
 		except Exception as e:
 			popup.destroy()
 			messagebox.showerror("Preview Error", f"Failed to load image: {e}")
+
+	def schedule_update_check(self, initial_delay_ms: int = 0):
+		"""Schedule a non-blocking update check and optional periodic rechecks."""
+		update_url = CONFIG.get("update_url", "").strip()
+		if not update_url:
+			return
+		self.after(initial_delay_ms, self._start_update_check_thread)
+		self.after(UPDATE_CHECK_INTERVAL_MS, self._schedule_next_update_check)
+
+	def _schedule_next_update_check(self):
+		self._start_update_check_thread()
+		self.after(UPDATE_CHECK_INTERVAL_MS, self._schedule_next_update_check)
+
+	def _start_update_check_thread(self):
+		threading.Thread(target=self._check_for_updates, daemon=True).start()
+
+	def _check_for_updates(self):
+		update_url = CONFIG.get("update_url", "").strip()
+		if not update_url:
+			return
+		try:
+			with urllib.request.urlopen(update_url, timeout=5) as response:
+				payload = response.read().decode("utf-8")
+			data = json.loads(payload)
+		except Exception:
+			return
+
+		remote_version = data.get("version") or data.get("tag_name") or ""
+		download_url = data.get("url") or data.get("html_url") or ""
+		notes = data.get("notes") or data.get("body") or ""
+
+		if not remote_version or not download_url:
+			return
+
+		if _is_newer_version(str(remote_version), APP_VERSION):
+			self.after(0, lambda: self.show_update_banner(str(remote_version), download_url, str(notes)))
+
+	def show_update_banner(self, remote_version: str, download_url: str, notes: str = ""):
+		self._update_url = download_url
+		label_text = f"Update available: v{remote_version}"
+		if notes:
+			label_text += "  •  " + notes[:80].strip()
+		self.update_label.configure(text=label_text)
+		self.update_bar.pack(side="right", padx=10)
+
+	def dismiss_update_banner(self):
+		self.update_bar.pack_forget()
+
+	def open_update_url(self):
+		if not self._update_url:
+			return
+		try:
+			webbrowser.open(self._update_url)
+		except Exception:
+			pass
 
 
 def main():
