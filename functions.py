@@ -9,8 +9,6 @@ import shutil
 import tkinter as tk
 from tkinter import simpledialog, filedialog
 
-APP_NAME = "PixelTyper"
-
 def get_resource_path(relative_path):
 	"""Get absolute path to resource, works for dev and for PyInstaller bundle"""
 	try:
@@ -42,6 +40,7 @@ def ensure_user_dir(*parts):
 	os.makedirs(path, exist_ok=True)
 	return path
 
+
 def _is_dir_empty(path: str) -> bool:
 	try:
 		return not any(os.scandir(path))
@@ -67,6 +66,13 @@ def ensure_user_fonts_dir():
 
 
 CONFIG: dict = json.load(open(get_resource_path("config.json"), "r"))
+APP_NAME = CONFIG.get("app_name", "PixelTyper")
+APP_VERSION = CONFIG.get("app_version", "1.0")
+DEBUG = CONFIG.get("debug", "").lower() in ("1", "true", "yes", "on")
+
+def _debug(message: str) -> None:
+	if DEBUG:
+		print(message)
 
 def _clamp_opacity(value) -> int:
 	try:
@@ -162,13 +168,13 @@ def _load_font(font_name, font_size=20):
 					for font_file in font_map[system_font_name]:
 						system_path = f"C:\\Windows\\Fonts\\{font_file}"
 						if os.path.exists(system_path):
-							print(f"DEBUG: Loading Windows font: {system_path}")
+							_debug(f"DEBUG: Loading Windows font: {system_path}")
 							return ImageFont.truetype(system_path, font_size)
 				
 				# Try all variations
 				for path in font_variations:
 					if os.path.exists(path):
-						print(f"DEBUG: Loading Windows font: {path}")
+						_debug(f"DEBUG: Loading Windows font: {path}")
 						return ImageFont.truetype(path, font_size)
 			elif system == "Darwin":  # macOS
 				# Try system fonts
@@ -387,7 +393,7 @@ def apply_template_to_image(image_path, template_name, text_mapping: dict, text_
 	
 	# Debug: Print font overrides
 	if font_overrides:
-		print(f"DEBUG: Font overrides received: {font_overrides}")
+		_debug(f"DEBUG: Font overrides received: {font_overrides}")
 	
 	# Apply each text to its named coordinate
 	for point_name, text in text_mapping.items():
@@ -405,14 +411,14 @@ def apply_template_to_image(image_path, template_name, text_mapping: dict, text_
 			point_color = overrides.get("font_color", point_data.get("font_color", text_color))
 			point_style = overrides.get("font_style", point_data.get("font_style", "default"))
 			point_opacity = overrides.get("opacity", point_data.get("opacity", opacity))
-			print(f"DEBUG: Using overrides for {point_name}: size={point_font_size}, color={point_color}, style={point_style}")
+			_debug(f"DEBUG: Using overrides for {point_name}: size={point_font_size}, color={point_color}, style={point_style}")
 		else:
 			# Use point-specific font settings if available, otherwise use defaults
 			point_font_size = point_data.get("font_size", font_size)
 			point_color = point_data.get("font_color", text_color)
 			point_style = point_data.get("font_style", "default")
 			point_opacity = point_data.get("opacity", opacity)
-			print(f"DEBUG: Using template defaults for {point_name}: size={point_font_size}, color={point_color}, style={point_style}")
+			_debug(f"DEBUG: Using template defaults for {point_name}: size={point_font_size}, color={point_color}, style={point_style}")
 		
 		# Load font with point-specific size
 		font = _load_font(point_style, point_font_size)

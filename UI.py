@@ -11,13 +11,27 @@ import re
 import threading
 import webbrowser
 import urllib.request
+import subprocess
 from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
 	from __main__ import PixelTyperApp
 
-CONFIG = fn.CONFIG  # Import CONFIG for font access
-APP_VERSION = "1.0"
+CONFIG = fn.CONFIG  # Import CONFIG from functions.py for use in UI.py
+
+def _open_file(path: str) -> bool:
+	"""Open a file with the default app in a cross-platform way."""
+	try:
+		system = platform.system()
+		if system == "Windows":
+			os.startfile(path)
+		elif system == "Darwin":
+			subprocess.run(["open", path], check=False)
+		else:
+			subprocess.run(["xdg-open", path], check=False)
+		return True
+	except Exception:
+		return False
 UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000  # 6 hours
 
 
@@ -638,10 +652,8 @@ class SimpleOverlayTab(ctk.CTkFrame):
 			self.status_label.configure(text="Output file not found", text_color=COLORS["error"])
 			self.open_output_btn.configure(state="disabled")
 			return
-		try:
-			os.startfile(self.last_output_path)
-		except Exception as e:
-			self.status_label.configure(text=f"Failed to open: {e}", text_color=COLORS["error"])
+		if not _open_file(self.last_output_path):
+			self.status_label.configure(text="Failed to open output file", text_color=COLORS["error"])
 
 
 class CreateTemplateTab(ctk.CTkFrame):
@@ -1109,12 +1121,12 @@ class ApplyTemplateTab(ctk.CTkFrame):
 						"font_style": font_style or "default",
 						"opacity": opacity
 					}
-					print(f"DEBUG UI: Collected for {point_name}: size={font_size}, color={font_color}, style={font_style}")
+					fn._debug(f"DEBUG UI: Collected for {point_name}: size={font_size}, color={font_color}, style={font_style}")
 				except ValueError:
 					messagebox.showwarning("Invalid Input", f"Font size for '{point_name}' must be a number!")
 					return
 		
-		print(f"DEBUG UI: Final font_overrides = {font_overrides}")
+		fn._debug(f"DEBUG UI: Final font_overrides = {font_overrides}")
 		
 		try:
 			template_name = self.template_menu.get()
@@ -1175,10 +1187,8 @@ class ApplyTemplateTab(ctk.CTkFrame):
 			self.status_label.configure(text="Output file not found", text_color=COLORS["error"])
 			self.open_output_btn.configure(state="disabled")
 			return
-		try:
-			os.startfile(self.last_output_path)
-		except Exception as e:
-			self.status_label.configure(text=f"Failed to open: {e}", text_color=COLORS["error"])
+		if not _open_file(self.last_output_path):
+			self.status_label.configure(text="Failed to open output file", text_color=COLORS["error"])
 	
 	def update_template(self):
 		"""Update template with modified font settings"""
@@ -1396,7 +1406,7 @@ class PixelTyperApp(ctk.CTk):
 		if not remote_version or not download_url:
 			return
 
-		if _is_newer_version(str(remote_version), APP_VERSION):
+		if _is_newer_version(str(remote_version), fn.APP_VERSION):
 			self.after(0, lambda: self.show_update_banner(str(remote_version), download_url, str(notes)))
 
 	def show_update_banner(self, remote_version: str, download_url: str, notes: str = ""):
