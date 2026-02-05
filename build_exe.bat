@@ -13,7 +13,6 @@ pyinstaller --name=PixelTyper ^
     --windowed ^
     --icon=icon.ico ^
     --add-data "config.json;." ^
-    --add-data "fonts;fonts" ^
     --add-data "icon.ico;." ^
     --collect-all ctk_colorpicker_plus ^
     --hidden-import=PIL ^

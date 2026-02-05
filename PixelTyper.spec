@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('config.json', '.'), ('fonts', 'fonts'), ('icon.ico', '.')]
+datas = [('config.json', '.'), ('icon.ico', '.')]
 binaries = []
 hiddenimports = ['PIL', 'PIL._tkinter_finder', 'cv2', 'customtkinter', 'ctk_colorpicker_plus']
 tmp_ret = collect_all('ctk_colorpicker_plus')
